@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Disposition Agent</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(145deg, #0a0f1a 0%, #0f172a 40%, #1a1a2e 100%);
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-12px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 8px rgba(245,158,11,0.3); }
+      50% { box-shadow: 0 0 20px rgba(245,158,11,0.5); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .config-card:hover { border-color: #334155 !important; }
+    .log-line { animation: slideIn 0.3s ease-out; }
+    .running-card { animation: glow 2s ease-in-out infinite; }
+    .agent-card { transition: all 0.3s ease; }
+    select option { background: #0f172a; color: #e2e8f0; }
+    input:focus, select:focus { border-color: #f59e0b !important; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    // ── Config (will come from backend later) ──
+    const TECH_STACK_OPTIONS = [
+      { value: "abap", label: "ABAP" },
+      { value: "functional", label: "Functional" },
+      { value: "integration", label: "Integration" },
+      { value: "basis", label: "Basis" },
+      { value: "fiori", label: "FIORI" },
+    ];
+
+    const AGENT_STEPS = [
+      { id: "agent1", name: "Legacy Analyzer", icon: "📄", description: "Reading documents & understanding current system" },
+      { id: "agent2", name: "Discussion Analyzer", icon: "🎙️", description: "Processing call recordings & extracting decisions" },
+      { id: "agent3", name: "Solution Architect", icon: "🧠", description: "Mapping AS-IS to To-Be per template" },
+      { id: "agent4", name: "Doc Generator", icon: "📋", description: "Rendering final disposition document" },
+    ];
+
+    // ── Pulse Dot Component ──
+    function PulseDot({ color = "#22c55e", delay = 0 }) {
+      return (
+        <span style={{
+          display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+          backgroundColor: color, animation: `pulse 1.4s ease-in-out ${delay}s infinite`, marginRight: 3,
+        }} />
+      );
+    }
+
+    // ── Main App ──
+    function App() {
+      const [techStack, setTechStack] = useState("");
+      const [templateFile, setTemplateFile] = useState(null);
+      const [folderPath, setFolderPath] = useState("");
+      const [isRunning, setIsRunning] = useState(false);
+      const [currentAgent, setCurrentAgent] = useState(-1);
+      const [agentStates, setAgentStates] = useState({});
+      const [logs, setLogs] = useState([]);
+      const [completed, setCompleted] = useState(false);
+      const fileInputRef = useRef(null);
+      const logEndRef = useRef(null);
+
+      useEffect(() => {
+        logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [logs]);
+
+      const addLog = (agent, message, type = "info") => {
+        setLogs(prev => [...prev, {
+          time: new Date().toLocaleTimeString(),
+          agent, message, type,
+        }]);
+      };
+
+      const handleTemplateUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          if (file.name.endsWith(".docx") || file.name.endsWith(".doc")) {
+            setTemplateFile(file);
+          } else {
+            alert("Please upload a .docx file");
+          }
+        }
+      };
+
+      const canStart = techStack && templateFile && folderPath;
+
+      // ── Simulated agent run (replace with real API calls later) ──
+      const simulateAgentRun = async () => {
+        setIsRunning(true);
+        setCompleted(false);
+        setLogs([]);
+        setAgentStates({});
+
+        const simulateAgent = (index, steps) => {
+          return new Promise((resolve) => {
+            setCurrentAgent(index);
+            setAgentStates(prev => ({ ...prev, [index]: "running" }));
+            addLog(AGENT_STEPS[index].name, "Starting...", "start");
+
+            let step = 0;
+            const interval = setInterval(() => {
+              if (step < steps.length) {
+                addLog(AGENT_STEPS[index].name, steps[step]);
+                step++;
+              } else {
+                clearInterval(interval);
+                setAgentStates(prev => ({ ...prev, [index]: "done" }));
+                addLog(AGENT_STEPS[index].name, "Completed ✓", "success");
+                resolve();
+              }
+            }, 1200);
+          });
+        };
+
+        await simulateAgent(0, [
+          `Scanning folder: ${folderPath}`,
+          "Found 3 documents (.pdf, .docx, .md)",
+          `Filtering for ${techStack.toUpperCase()} context...`,
+          "Reading: legacy_spec_v2.pdf",
+          "Reading: current_process.docx",
+          "Reading: code_documentation.md",
+          "Extracting AS-IS functionality...",
+          "Building legacy context map...",
+        ]);
+
+        await simulateAgent(1, [
+          "Scanning folder for .mp4 recordings...",
+          "Found 2 recordings",
+          "Transcribing: sprint_review_jan15.mp4",
+          "Transcribing: design_discussion_jan20.mp4",
+          `Extracting ${techStack.toUpperCase()}-related decisions...`,
+          "Identifying speaker agreements & conflicts...",
+          "Building discussion context map...",
+        ]);
+
+        await simulateAgent(2, [
+          `Parsing template: ${templateFile.name}`,
+          "Detected 12 template sections",
+          "Mapping AS-IS data to 'Current Process' section",
+          "Mapping discussions to 'To-Be Process' section",
+          "Determining RICEFW Extension Type...",
+          "Determining Clean Core classification...",
+          "Preparing diagram descriptions (AS-IS + To-Be)",
+          "Building section-wise solution JSON...",
+        ]);
+
+        await simulateAgent(3, [
+          "Received structured content from Solution Architect",
+          `Loading template: ${templateFile.name}`,
+          "Rendering: Title & Requirement",
+          "Rendering: Current Process + Diagram",
+          "Rendering: To-Be Process + Diagram",
+          "Rendering: RICEFW & Clean Core fields",
+          "Rendering: Technical Change Description",
+          "Saving: Disposition_Output.docx",
+        ]);
+
+        setIsRunning(false);
+        setCurrentAgent(-1);
+        setCompleted(true);
+        addLog("System", "All agents completed. Document ready for download.", "success");
+      };
+
+      const getAgentStatusStyle = (index) => {
+        const state = agentStates[index];
+        if (state === "done") return { border: "2px solid #22c55e", background: "rgba(34,197,94,0.08)" };
+        if (state === "running") return { border: "2px solid #f59e0b", background: "rgba(245,158,11,0.08)" };
+        return { border: "2px solid #1e293b", background: "rgba(30,41,59,0.3)" };
+      };
+
+      const getLogColor = (type) => {
+        if (type === "success") return "#22c55e";
+        if (type === "start") return "#f59e0b";
+        if (type === "error") return "#ef4444";
+        return "#94a3b8";
+      };
+
+      return (
+        <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+
+          {/* ── Header ── */}
+          <div style={{
+            padding: "20px 32px", borderBottom: "1px solid rgba(148,163,184,0.1)",
+            display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
+          }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 26 }}>⚡</span>
+                <h1 style={{
+                  fontSize: 21, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+                  letterSpacing: "-0.5px",
+                  background: "linear-gradient(135deg, #e2e8f0, #94a3b8)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                }}>Disposition Agent</h1>
+              </div>
+              <p style={{ margin: "4px 0 0 36px", fontSize: 11, color: "#64748b", letterSpacing: "0.5px" }}>
+                AI-powered disposition document generator
+              </p>
+            </div>
+            <div style={{ fontSize: 11, color: "#475569", padding: "5px 10px", border: "1px solid #1e293b", borderRadius: 6 }}>
+              v0.1.0
+            </div>
+          </div>
+
+          {/* ── Main Layout ── */}
+          <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+
+            {/* ── LEFT PANEL — Config ── */}
+            <div style={{
+              width: 340, minWidth: 340, padding: "24px 22px",
+              borderRight: "1px solid rgba(148,163,184,0.1)", overflowY: "auto",
+            }}>
+              <div style={{
+                fontSize: 11, fontWeight: 600, color: "#64748b",
+                letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 18,
+              }}>Configuration</div>
+
+              {/* Tech Stack */}
+              <div style={{ marginBottom: 22 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#94a3b8", marginBottom: 7 }}>
+                  Tech Stack
+                </label>
+                <select
+                  value={techStack}
+                  onChange={(e) => setTechStack(e.target.value)}
+                  disabled={isRunning}
+                  style={{
+                    width: "100%", padding: "9px 12px", background: "#0f172a",
+                    border: "1.5px solid #1e293b", borderRadius: 8,
+                    color: techStack ? "#e2e8f0" : "#475569",
+                    fontSize: 13, fontFamily: "inherit", outline: "none",
+                    cursor: "pointer", appearance: "none",
+                  }}
+                >
+                  <option value="">Select technology...</option>
+                  {TECH_STACK_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Template Upload */}
+              <div style={{ marginBottom: 22 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#94a3b8", marginBottom: 7 }}>
+                  Disposition Template
+                </label>
+                <div
+                  onClick={() => !isRunning && fileInputRef.current?.click()}
+                  className="config-card"
+                  style={{
+                    padding: "14px", border: `1.5px dashed ${templateFile ? "#22c55e" : "#1e293b"}`,
+                    borderRadius: 8, cursor: isRunning ? "not-allowed" : "pointer",
+                    textAlign: "center", transition: "border-color 0.2s",
+                    background: templateFile ? "rgba(34,197,94,0.04)" : "transparent",
+                  }}
+                >
+                  <input ref={fileInputRef} type="file" accept=".docx,.doc"
+                    onChange={handleTemplateUpload} style={{ display: "none" }} />
+                  {templateFile ? (
+                    <div>
+                      <div style={{ fontSize: 20, marginBottom: 5 }}>📄</div>
+                      <div style={{ fontSize: 12, color: "#22c55e", fontWeight: 500 }}>{templateFile.name}</div>
+                      <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>
+                        {(templateFile.size / 1024).toFixed(1)} KB • Click to replace
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ fontSize: 20, marginBottom: 5 }}>📤</div>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>Upload .docx template</div>
+                      <div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>Click to browse</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Folder Path */}
+              <div style={{ marginBottom: 28 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#94a3b8", marginBottom: 7 }}>
+                  Source Folder Path
+                </label>
+                <input
+                  type="text" value={folderPath}
+                  onChange={(e) => setFolderPath(e.target.value)}
+                  disabled={isRunning}
+                  placeholder="e.g., ./project-data"
+                  style={{
+                    width: "100%", padding: "9px 12px", background: "#0f172a",
+                    border: "1.5px solid #1e293b", borderRadius: 8,
+                    color: "#e2e8f0", fontSize: 13, fontFamily: "inherit", outline: "none",
+                  }}
+                />
+                <div style={{ fontSize: 11, color: "#475569", marginTop: 5, lineHeight: 1.5 }}>
+                  Folder with .docx/.pdf docs and .mp4 recordings. Agents auto-sort by file type.
+                </div>
+              </div>
+
+              {/* Run Button */}
+              <button
+                onClick={simulateAgentRun}
+                disabled={!canStart || isRunning}
+                style={{
+                  width: "100%", padding: "11px",
+                  background: canStart && !isRunning ? "linear-gradient(135deg, #f59e0b, #d97706)" : "#1e293b",
+                  border: "none", borderRadius: 8,
+                  color: canStart && !isRunning ? "#0f172a" : "#475569",
+                  fontSize: 13, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif",
+                  letterSpacing: "0.5px",
+                  cursor: canStart && !isRunning ? "pointer" : "not-allowed",
+                  transition: "all 0.2s",
+                }}
+              >
+                {isRunning ? (
+                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                    <PulseDot color="#0f172a" />
+                    <PulseDot color="#0f172a" delay={0.2} />
+                    <PulseDot color="#0f172a" delay={0.4} />
+                    <span style={{ marginLeft: 4 }}>Agents Running...</span>
+                  </span>
+                ) : completed ? "▶  Run Again" : "▶  Start Agents"}
+              </button>
+
+              {completed && (
+                <button style={{
+                  width: "100%", padding: "11px", marginTop: 10,
+                  background: "rgba(34,197,94,0.1)", border: "1.5px solid #22c55e",
+                  borderRadius: 8, color: "#22c55e", fontSize: 13, fontWeight: 600,
+                  fontFamily: "'Space Grotesk', sans-serif", cursor: "pointer",
+                }}>
+                  ⬇  Download Disposition Document
+                </button>
+              )}
+            </div>
+
+            {/* ── RIGHT PANEL — Pipeline + Logs ── */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+              {/* Agent Pipeline Cards */}
+              <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(148,163,184,0.1)", flexShrink: 0 }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 600, color: "#64748b",
+                  letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: 14,
+                }}>Agent Pipeline</div>
+
+                <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
+                  {AGENT_STEPS.map((agent, i) => (
+                    <div key={agent.id} style={{ display: "flex", alignItems: "center", flex: 1 }}>
+                      <div
+                        className={`agent-card ${agentStates[i] === "running" ? "running-card" : ""}`}
+                        style={{
+                          flex: 1, padding: "12px 14px", borderRadius: 10,
+                          ...getAgentStatusStyle(i), position: "relative",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                          <span style={{ fontSize: 17 }}>{agent.icon}</span>
+                          <span style={{
+                            fontSize: 11.5, fontWeight: 600,
+                            fontFamily: "'Space Grotesk', sans-serif",
+                            color: agentStates[i] === "running" ? "#f59e0b"
+                              : agentStates[i] === "done" ? "#22c55e" : "#94a3b8",
+                          }}>{agent.name}</span>
+                        </div>
+                        <div style={{ fontSize: 10.5, color: "#64748b", lineHeight: 1.4 }}>
+                          {agent.description}
+                        </div>
+                        <div style={{
+                          position: "absolute", top: 7, right: 9,
+                          fontSize: 9.5, fontWeight: 600, padding: "2px 7px", borderRadius: 10,
+                          background: agentStates[i] === "done" ? "rgba(34,197,94,0.15)"
+                            : agentStates[i] === "running" ? "rgba(245,158,11,0.15)" : "transparent",
+                          color: agentStates[i] === "done" ? "#22c55e"
+                            : agentStates[i] === "running" ? "#f59e0b" : "#334155",
+                        }}>
+                          {agentStates[i] === "done" ? "DONE" : agentStates[i] === "running" ? "ACTIVE" : "IDLE"}
+                        </div>
+                      </div>
+                      {i < AGENT_STEPS.length - 1 && (
+                        <div style={{
+                          padding: "0 3px",
+                          color: agentStates[i] === "done" ? "#22c55e" : "#1e293b",
+                          fontSize: 15, transition: "color 0.3s",
+                        }}>→</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Live Logs */}
+              <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div style={{
+                  padding: "14px 24px 6px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 600, color: "#64748b",
+                    letterSpacing: "1.5px", textTransform: "uppercase",
+                  }}>Live Logs</div>
+                  {logs.length > 0 && (
+                    <div style={{ fontSize: 11, color: "#475569" }}>{logs.length} entries</div>
+                  )}
+                </div>
+
+                <div style={{
+                  flex: 1, overflowY: "auto", padding: "6px 24px 16px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}>
+                  {logs.length === 0 ? (
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      height: "100%", color: "#334155", fontSize: 13,
+                      flexDirection: "column", gap: 8,
+                    }}>
+                      <span style={{ fontSize: 32, opacity: 0.3 }}>⚡</span>
+                      <span>Configure and start agents to see logs</span>
+                    </div>
+                  ) : (
+                    logs.map((log, i) => (
+                      <div key={i} className="log-line" style={{
+                        display: "flex", gap: 12, padding: "4px 0", fontSize: 11.5,
+                        borderBottom: "1px solid rgba(30,41,59,0.5)", alignItems: "baseline",
+                      }}>
+                        <span style={{ color: "#334155", minWidth: 65, flexShrink: 0 }}>{log.time}</span>
+                        <span style={{
+                          color: getLogColor(log.type), minWidth: 130, flexShrink: 0, fontWeight: 500,
+                        }}>[{log.agent}]</span>
+                        <span style={{ color: log.type === "success" ? "#22c55e" : "#cbd5e1" }}>
+                          {log.message}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                  <div ref={logEndRef} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Mount ──
+    ReactDOM.render(<App />, document.getElementById("root"));
+  </script>
+</body>
+</html>
